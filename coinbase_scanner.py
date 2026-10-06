@@ -8,9 +8,10 @@ st.set_page_config(page_title="Coinbase Income Engine", layout="wide")
 st.title("🪙 Coinbase Advanced Trade Engine")
 st.markdown("**Operational Target:** Spot Momentum & Stablecoin Yield Protection")
 
-# Load credentials safely from Streamlit secrets
+# Load and normalize credentials safely from Streamlit secrets
 default_key = st.secrets["CDP_API_KEY_NAME"] if "CDP_API_KEY_NAME" in st.secrets else ""
-default_secret = st.secrets["CDP_PRIVATE_KEY"] if "CDP_PRIVATE_KEY" in st.secrets else ""
+raw_secret = st.secrets["CDP_PRIVATE_KEY"] if "CDP_PRIVATE_KEY" in st.secrets else ""
+default_secret = raw_secret.replace('\\n', '\n')
 
 # Sidebar: API Credentials & Parameters
 st.sidebar.header("Coinbase Configuration")
