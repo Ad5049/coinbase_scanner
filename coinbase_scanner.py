@@ -8,19 +8,29 @@ st.set_page_config(page_title="Coinbase Income Engine", layout="wide")
 st.title("🪙 Coinbase Advanced Trade Engine")
 st.markdown("**Operational Target:** Spot Momentum & Stablecoin Yield Protection")
 
-# Load and rigorously sanitize credentials from Streamlit secrets
+def sanitize_private_key(raw_key):
+    if not raw_key:
+        return ""
+    # Replace literal string escaped newlines with real newlines
+    cleaned = raw_key.replace("\\n", "\n")
+    # Strip headers/footers and all internal whitespace to get pure base64 payload
+    body = cleaned.replace("-----BEGIN EC PRIVATE KEY-----", "").replace("-----END EC PRIVATE KEY-----", "").strip()
+    body = "".join(body.split())
+    if not body:
+        return raw_key
+    # Rebuild standard PEM block with correct 64-character line wraps
+    chunks = [body[i:i+64] for i in range(0, len(body), 64)]
+    return f"-----BEGIN EC PRIVATE KEY-----\n" + "\n".join(chunks) + "\n-----END EC PRIVATE KEY-----\n"
+
+# Load credentials safely from Streamlit secrets
 default_key = st.secrets["CDP_API_KEY_NAME"] if "CDP_API_KEY_NAME" in st.secrets else ""
 raw_secret = st.secrets["CDP_PRIVATE_KEY"] if "CDP_PRIVATE_KEY" in st.secrets else ""
-
-# Sanitize literal escape characters and normalize newlines
-clean_secret = raw_secret.replace("\\n", "\n").strip()
-if not clean_secret.startswith("-----BEGIN"):
-    clean_secret = f"-----BEGIN EC PRIVATE KEY-----\n{clean_secret}\n-----END EC PRIVATE KEY-----"
+default_secret = sanitize_private_key(raw_secret)
 
 # Sidebar: API Credentials & Parameters
 st.sidebar.header("Coinbase Configuration")
 api_key_input = st.sidebar.text_input("CDP API Key Name", value=default_key, type="default")
-api_secret_input = st.sidebar.text_area("CDP Private Key", value=clean_secret)
+api_secret_input = st.sidebar.text_area("CDP Private Key", value=default_secret)
 
 target_pairs = st.sidebar.multiselect("Active Pairs", ["BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD"], default=["BTC-USD", "ETH-USD"])
 min_momentum = st.sidebar.slider("Min 24h Change Filter (%)", 0.0, 10.0, 2.0, 0.5)
@@ -29,7 +39,9 @@ min_momentum = st.sidebar.slider("Min 24h Change Filter (%)", 0.0, 10.0, 2.0, 0.
 st.subheader("Wallet Asset Reconciliation")
 if api_key_input and api_secret_input:
     try:
-        client = RESTClient(api_key=api_key_input, api_secret=api_secret_input)
+        # Sanitize sidebar text area input as well in case it was edited live
+        active_secret = sanitize_private_key(api_secret_input)
+        client = RESTClient(api_key=api_key_input, api_secret=active_secret)
         accounts_response = client.get_accounts()
         
         accounts_data = []
