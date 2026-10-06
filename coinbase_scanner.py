@@ -8,19 +8,19 @@ st.set_page_config(page_title="Coinbase Income Engine", layout="wide")
 st.title("🪙 Coinbase Advanced Trade Engine")
 st.markdown("**Operational Target:** Spot Momentum & Stablecoin Yield Protection")
 
----
+# Load credentials safely from Streamlit secrets
+default_key = st.secrets["CDP_API_KEY_NAME"] if "CDP_API_KEY_NAME" in st.secrets else ""
+default_secret = st.secrets["CDP_PRIVATE_KEY"] if "CDP_PRIVATE_KEY" in st.secrets else ""
 
-## Sidebar: API Credentials & Parameters
+# Sidebar: API Credentials & Parameters
 st.sidebar.header("Coinbase Configuration")
-api_key_input = st.sidebar.text_input("CDP API Key Name", type="default", placeholder="organizations/.../apiKeys/...")
-api_secret_input = st.sidebar.text_area("CDP Private Key", placeholder="-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----")
+api_key_input = st.sidebar.text_input("CDP API Key Name", value=default_key, type="default")
+api_secret_input = st.sidebar.text_area("CDP Private Key", value=default_secret)
 
 target_pairs = st.sidebar.multiselect("Active Pairs", ["BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD"], default=["BTC-USD", "ETH-USD"])
 min_momentum = st.sidebar.slider("Min 24h Change Filter (%)", 0.0, 10.0, 2.0, 0.5)
 
----
-
-## Account & Holding Status
+# Account & Holding Status
 st.subheader("Wallet Asset Reconciliation")
 if api_key_input and api_secret_input:
     try:
@@ -47,11 +47,9 @@ if api_key_input and api_secret_input:
     except Exception as e:
         st.error(f"Authentication or connection failed: {e}")
 else:
-    st.warning("Enter your CDP API credentials in the sidebar to initialize live wallet reads.")
+    st.warning("Enter your CDP API credentials in the sidebar or configure Streamlit secrets.")
 
----
-
-## Live Market Momentum Scanner
+# Live Market Momentum Scanner
 st.subheader("Targeted Spot Opportunities")
 
 if st.button("Scan Market Tickers"):
@@ -86,9 +84,7 @@ if st.button("Scan Market Tickers"):
     except Exception as e:
         st.error(f"Failed to fetch market data: {e}")
 
----
-
-## Execution Log
+# Execution Log
 st.subheader("Order Execution Ledger")
 if 'crypto_ledger' not in st.session_state:
     st.session_state.crypto_ledger = []
@@ -97,4 +93,4 @@ if st.session_state.crypto_ledger:
     st.dataframe(pd.DataFrame(st.session_state.crypto_ledger), use_container_width=True)
 else:
     st.write("No trades executed in current session.")
-  
+    
