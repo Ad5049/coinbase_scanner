@@ -8,15 +8,19 @@ st.set_page_config(page_title="Coinbase Income Engine", layout="wide")
 st.title("🪙 Coinbase Advanced Trade Engine")
 st.markdown("**Operational Target:** Spot Momentum & Stablecoin Yield Protection")
 
-# Load and normalize credentials safely from Streamlit secrets
+# Load and rigorously sanitize credentials from Streamlit secrets
 default_key = st.secrets["CDP_API_KEY_NAME"] if "CDP_API_KEY_NAME" in st.secrets else ""
 raw_secret = st.secrets["CDP_PRIVATE_KEY"] if "CDP_PRIVATE_KEY" in st.secrets else ""
-default_secret = raw_secret.replace('\\n', '\n')
+
+# Sanitize literal escape characters and normalize newlines
+clean_secret = raw_secret.replace("\\n", "\n").strip()
+if not clean_secret.startswith("-----BEGIN"):
+    clean_secret = f"-----BEGIN EC PRIVATE KEY-----\n{clean_secret}\n-----END EC PRIVATE KEY-----"
 
 # Sidebar: API Credentials & Parameters
 st.sidebar.header("Coinbase Configuration")
 api_key_input = st.sidebar.text_input("CDP API Key Name", value=default_key, type="default")
-api_secret_input = st.sidebar.text_area("CDP Private Key", value=default_secret)
+api_secret_input = st.sidebar.text_area("CDP Private Key", value=clean_secret)
 
 target_pairs = st.sidebar.multiselect("Active Pairs", ["BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD"], default=["BTC-USD", "ETH-USD"])
 min_momentum = st.sidebar.slider("Min 24h Change Filter (%)", 0.0, 10.0, 2.0, 0.5)
