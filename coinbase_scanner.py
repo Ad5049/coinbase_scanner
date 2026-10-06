@@ -5,16 +5,17 @@ import requests
 # Page configuration
 st.set_page_config(page_title="Coinbase Income Engine", layout="wide")
 
-st.title("🪙 Coinbase Public Spot Scanner")
-st.markdown("**Operational Target:** Real-Time Momentum & Spread Discovery (No Auth Hassles)")
+st.title("🪙 Coinbase Public Spot Scanner & Exit Planner")
+st.markdown("**Operational Target:** Automated Entry Signals & Take-Profit Targets for Hands-Off Execution")
 
 # Sidebar Parameters
-st.sidebar.header("Scanner Configuration")
-target_pairs = st.sidebar.multiselect("Active Pairs", ["BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD", "DOGE-USD"], default=["BTC-USD", "ETH-USD", "SOL-USD"])
+st.sidebar.header("Scanner & Exit Parameters")
+target_pairs = st.sidebar.multiselect("Active Pairs", ["BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD", "DOGE-USD"], default=["BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD"])
 min_momentum = st.sidebar.slider("Min 24h Change Filter (%)", 0.0, 10.0, 1.5, 0.5)
+profit_target_pct = st.sidebar.slider("Automated Take-Profit Target (%)", 1.0, 10.0, 3.0, 0.5)
 
 # Live Market Momentum Scanner
-st.subheader("Targeted Spot Opportunities")
+st.subheader("Targeted Spot Opportunities & Exit Targets")
 
 if st.button("Scan Coinbase Markets"):
     try:
@@ -22,7 +23,6 @@ if st.button("Scan Coinbase Markets"):
         headers = {"Accept": "application/json"}
         
         for pair in target_pairs:
-            # Use public Coinbase Exchange API endpoint
             url = f"https://api.exchange.coinbase.com/products/{pair}/stats"
             response = requests.get(url, headers=headers)
             
@@ -33,24 +33,25 @@ if st.button("Scan Coinbase Markets"):
                 high_price = float(data.get('high', 0.0))
                 low_price = float(data.get('low', 0.0))
                 
-                # Calculate 24h price change percentage
                 pct_change = ((last_price - open_price) / open_price) * 100.0 if open_price > 0 else 0.0
+                
+                # Automatically calculate target exit price based on selected profit %
+                target_exit_price = round(last_price * (1.0 + (profit_target_pct / 100.0)), 4)
                 
                 market_rows.append({
                     "Product": pair,
-                    "Last Price ($)": last_price,
-                    "24h Open": open_price,
-                    "24h High": high_price,
-                    "24h Low": low_price,
-                    "Change %": round(pct_change, 2)
+                    "Current Price ($)": last_price,
+                    "24h Change %": round(pct_change, 2),
+                    f"Target Exit (+{profit_target_pct}%)": target_exit_price
                 })
                 
         if market_rows:
             scan_df = pd.DataFrame(market_rows)
-            filtered_scan = scan_df[scan_df["Change %"] >= min_momentum]
+            filtered_scan = scan_df[scan_df["24h Change %"] >= min_momentum]
             
             if not filtered_scan.empty:
                 st.dataframe(filtered_scan, use_container_width=True)
+                st.markdown("👉 **Action Protocol:** When entering a position, immediately set your Coinbase Limit Sell order to the exact **Target Exit** price displayed above, then close the app.")
             else:
                 st.info("Scanner active. No trading pairs currently meet the selected minimum momentum threshold.")
         else:
