@@ -4,9 +4,14 @@ from datetime import datetime
 
 # Configuration
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-PAIRS = ["BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD", "DOGE-USD", "LINK-USD"]
-MIN_24H_CHANGE = 0.50  # %
-TAKE_PROFIT_PCT = 3.0   # %
+
+# Expanded list of liquid pairs to catch more plays throughout the day
+PAIRS = [
+    "BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD", "DOGE-USD", "LINK-USD",
+    "SUI-USD", "NEAR-USD", "ADA-USD", "RENDER-USD", "FET-USD", "INJ-USD"
+]
+
+MIN_24H_CHANGE = 0.50  # % minimum threshold to trigger
 
 def send_discord_alerts(message):
     if not DISCORD_WEBHOOK_URL:
@@ -18,7 +23,7 @@ def send_discord_alerts(message):
         print(f"Failed to send Discord alert: {response.status_code}, {response.text}")
 
 def scan_markets():
-    print(f"[{datetime.now()}] Running Coinbase momentum scan...")
+    print(f"[{datetime.now()}] Running Coinbase momentum scan with expanded pairs...")
     alerts_sent = 0
 
     for pair in PAIRS:
@@ -38,13 +43,16 @@ def scan_markets():
             change_pct = ((last_price - open_price) / open_price) * 100
             
             if change_pct >= MIN_24H_CHANGE:
-                target_exit = last_price * (1 + (TAKE_PROFIT_PCT / 100))
+                # Dynamic take-profit calculation: scales from 2.0% up to 6.0% based on 24h momentum strength
+                dynamic_tp_pct = max(2.0, min(6.0, change_pct * 0.4))
+                target_exit = last_price * (1 + (dynamic_tp_pct / 100))
+                
                 msg = (
                     f"🚨 **Coinbase Momentum Signal Detected** 🚨\n"
                     f"• **Pair**: {pair}\n"
                     f"• **Current Price**: ${last_price:,.4f}\n"
                     f"• **24h Change**: +{change_pct:.2f}%\n"
-                    f"• **Target Exit (+{TAKE_PROFIT_PCT}%)**: **${target_exit:,.4f}**\n"
+                    f"• **Dynamic Target (+{dynamic_tp_pct:.1f}%)**: **${target_exit:,.4f}**\n"
                     f"👉 *Action: Open Coinbase Advanced, buy, and set Limit Sell to ${target_exit:,.4f}*"
                 )
                 send_discord_alerts(msg)
