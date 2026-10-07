@@ -5,13 +5,14 @@ from datetime import datetime
 # Configuration
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
-# Expanded list of liquid pairs to catch more plays throughout the day
+# Expanded list of liquid pairs
 PAIRS = [
     "BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD", "DOGE-USD", "LINK-USD",
     "SUI-USD", "NEAR-USD", "ADA-USD", "RENDER-USD", "FET-USD", "INJ-USD"
 ]
 
-MIN_24H_CHANGE = 0.50  # % minimum threshold to trigger
+# Using 1-hour candle momentum for frequent, high-probability intraday setups
+MIN_1H_CHANGE = 0.40  # % minimum threshold within the last hour
 
 def send_discord_alerts(message):
     if not DISCORD_WEBHOOK_URL:
@@ -23,35 +24,40 @@ def send_discord_alerts(message):
         print(f"Failed to send Discord alert: {response.status_code}, {response.text}")
 
 def scan_markets():
-    print(f"[{datetime.now()}] Running Coinbase momentum scan with expanded pairs...")
+    print(f"[{datetime.now()}] Running Coinbase 1-hour momentum scan...")
     alerts_sent = 0
 
     for pair in PAIRS:
-        url = f"https://api.exchange.coinbase.com/products/{pair}/stats"
+        # Fetch 1-hour granularity candles from Coinbase Exchange API (granularity = 3600 seconds)
+        url = f"https://api.exchange.coinbase.com/products/{pair}/candles?granularity=3600"
         try:
             res = requests.get(url, timeout=10)
             if res.status_code != 200:
                 continue
-            data = res.json()
+            candles = res.json()
             
-            open_price = float(data.get("open", 0))
-            last_price = float(data.get("last", 0))
-            
-            if open_price == 0:
+            if not candles or len(candles) < 2:
                 continue
                 
-            change_pct = ((last_price - open_price) / open_price) * 100
+            # Coinbase candles format: [time, low, high, open, close, volume]
+            # candles[0] is the current/most recent incomplete/completed 1h candle
+            current_open = float(candles[0][3])
+            current_close = float(candles[0][4])
             
-            if change_pct >= MIN_24H_CHANGE:
-                # Dynamic take-profit calculation: scales from 2.0% up to 6.0% based on 24h momentum strength
-                dynamic_tp_pct = max(2.0, min(6.0, change_pct * 0.4))
-                target_exit = last_price * (1 + (dynamic_tp_pct / 100))
+            if current_open == 0:
+                continue
+                
+            change_pct = ((current_close - current_open) / current_open) * 100
+            
+            if change_pct >= MIN_1H_CHANGE:
+                dynamic_tp_pct = max(2.0, min(6.0, change_pct * 0.6))
+                target_exit = current_close * (1 + (dynamic_tp_pct / 100))
                 
                 msg = (
-                    f"🚨 **Coinbase Momentum Signal Detected** 🚨\n"
+                    f"🚨 **Coinbase 1H Momentum Signal** 🚨\n"
                     f"• **Pair**: {pair}\n"
-                    f"• **Current Price**: ${last_price:,.4f}\n"
-                    f"• **24h Change**: +{change_pct:.2f}%\n"
+                    f"• **Current Price**: ${current_close:,.4f}\n"
+                    f"• **1H Change**: +{change_pct:.2f}%\n"
                     f"• **Dynamic Target (+{dynamic_tp_pct:.1f}%)**: **${target_exit:,.4f}**\n"
                     f"👉 *Action: Open Coinbase Advanced, buy, and set Limit Sell to ${target_exit:,.4f}*"
                 )
