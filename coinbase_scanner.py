@@ -5,14 +5,15 @@ from datetime import datetime
 # Configuration
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
-# Expanded list of liquid pairs
+# Expanded list of 20 liquid pairs for maximum coverage
 PAIRS = [
     "BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD", "DOGE-USD", "LINK-USD",
-    "SUI-USD", "NEAR-USD", "ADA-USD", "RENDER-USD", "FET-USD", "INJ-USD"
+    "SUI-USD", "NEAR-USD", "ADA-USD", "RENDER-USD", "FET-USD", "INJ-USD",
+    "MATIC-USD", "UNI-USD", "ATOM-USD", "ICP-USD", "APT-USD", "OP-USD", "ARB-USD", "XRP-USD"
 ]
 
-# Using 1-hour candle momentum for frequent, high-probability intraday setups
-MIN_1H_CHANGE = 0.40  # % minimum threshold within the last hour
+# Lowered threshold to 0.25% for more frequent intraday triggers
+MIN_1H_CHANGE = 0.25  
 
 def send_discord_alerts(message):
     if not DISCORD_WEBHOOK_URL:
@@ -24,11 +25,10 @@ def send_discord_alerts(message):
         print(f"Failed to send Discord alert: {response.status_code}, {response.text}")
 
 def scan_markets():
-    print(f"[{datetime.now()}] Running Coinbase 1-hour momentum scan...")
+    print(f"[{datetime.now()}] Running Coinbase expanded 1-hour momentum scan...")
     alerts_sent = 0
 
     for pair in PAIRS:
-        # Fetch 1-hour granularity candles from Coinbase Exchange API (granularity = 3600 seconds)
         url = f"https://api.exchange.coinbase.com/products/{pair}/candles?granularity=3600"
         try:
             res = requests.get(url, timeout=10)
@@ -39,8 +39,6 @@ def scan_markets():
             if not candles or len(candles) < 2:
                 continue
                 
-            # Coinbase candles format: [time, low, high, open, close, volume]
-            # candles[0] is the current/most recent incomplete/completed 1h candle
             current_open = float(candles[0][3])
             current_close = float(candles[0][4])
             
